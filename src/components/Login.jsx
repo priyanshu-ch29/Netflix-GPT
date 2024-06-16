@@ -1,10 +1,21 @@
 import React, { useRef, useState } from "react";
 import Header from "./Header";
 import { formValidate } from "..//utils/validate";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
+import { auth } from "../utils/firebase";
+import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { addUser } from "../utils/userSlice";
 
 const Login = () => {
   const [isSignInform, setIsSignInForm] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const name = useRef(null);
   const email = useRef(null);
@@ -16,19 +27,65 @@ const Login = () => {
   };
 
   const handleSignIn = () => {
-    let message;
-    if (isSignInform) {
-      message = formValidate(email.current?.value, password.current?.value);
-    } else {
-      message = formValidate(
-        email.current?.value,
-        password.current?.value,
-        name.current?.value,
-        phone.current?.value
-      );
-    }
-    // const message = formValidate(email.current.value, password.current.value);
+    const message = formValidate(email.current.value, password.current.value);
     setErrorMessage(message);
+
+    if (message) return;
+
+    if (!isSignInform) {
+      // signup logic
+      createUserWithEmailAndPassword(
+        auth,
+        email.current.value,
+        password.current.value
+      )
+        .then((userCredential) => {
+          // Signed up
+          const user = userCredential.user;
+          updateProfile(user, {
+            displayName: name.current.value,
+          })
+            .then(() => {
+              // Profile updated!
+              const { uid, email, displayName } = auth.currentUser;
+              dispatch(
+                addUser({ uid: uid, email: email, displayName: displayName })
+              );
+              navigate("/browse");
+              // ...
+            })
+            .catch((error) => {
+              // An error occurred
+              // ...
+            });
+
+          // ...
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          setErrorMessage(errorCode + "-" + errorMessage);
+          // ..
+        });
+    } else {
+      // signin logic
+      signInWithEmailAndPassword(
+        auth,
+        email.current.value,
+        password.current.value
+      )
+        .then((userCredential) => {
+          // Signed in
+          const user = userCredential.user;
+          navigate("/browse");
+          // ...
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          setErrorMessage(errorCode + "-" + errorMessage);
+        });
+    }
   };
 
   return (
@@ -93,8 +150,8 @@ const Login = () => {
           <h1 className=" text-gray-300 p-2 text-center mb-2 hover:underline cursor-pointer">
             Forgot password?
           </h1>
-          <input type="checkbox" className=" p-2 m-2" />{" "}
-          <span className="text-white">Remember me</span>
+          <input type="checkbox" className=" p-2 m-3" />{" "}
+          <span className="text-white p-2">Remember me</span>
           <h1 className=" text-gray-500 p-2 font-font-poppins">
             {isSignInform ? "New to Netflix?" : "Already a user?"}
             <span
